@@ -1,0 +1,7 @@
+.env
+node_modules/
+
+aws-exports.js
+dist/
+build/
+.vite/
