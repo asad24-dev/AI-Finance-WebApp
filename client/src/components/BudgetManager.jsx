@@ -21,13 +21,20 @@ const BudgetManager = () => {
 
   const fetchData = async () => {
     try {
+      console.log('Fetching budget data...');
       const [budgetsRes, categoriesRes] = await Promise.all([
         api.get('/budgets'),
         api.get('/budgets/categories')
       ]);
       
+      console.log('Budgets response:', budgetsRes.data);
+      console.log('Categories response:', categoriesRes.data);
+      
       setBudgets(budgetsRes.data.budgets);
       setBudgetCategories(categoriesRes.data.categories);
+      
+      console.log('Set budgets:', budgetsRes.data.budgets);
+      console.log('Set categories:', categoriesRes.data.categories);
     } catch (error) {
       console.error('Error fetching budget data:', error);
     } finally {
@@ -37,8 +44,12 @@ const BudgetManager = () => {
 
   const handleCreateBudget = async (e) => {
     e.preventDefault();
+    console.log('Creating budget with data:', newBudget);
+    
     try {
-      await api.post('/budgets', newBudget);
+      const response = await api.post('/budgets', newBudget);
+      console.log('Budget created successfully:', response.data);
+      
       setNewBudget({
         category: '',
         budgetAmount: '',
@@ -49,6 +60,7 @@ const BudgetManager = () => {
       fetchData();
     } catch (error) {
       console.error('Error creating budget:', error);
+      console.error('Error response:', error.response?.data);
       alert('Error creating budget: ' + (error.response?.data?.error || 'Unknown error'));
     }
   };

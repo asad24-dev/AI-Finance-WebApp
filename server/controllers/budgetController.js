@@ -1,23 +1,36 @@
 // controllers/budgetController.js
 const { Op } = require('sequelize');
 const Budget = require('../models/Budget');
+const Item = require('../models/Item');
+const { getCategorySpendingFromTransactions } = require('./analyticsController');
+const dotenv = require('dotenv');
+dotenv.config();
 
 // Create a new budget
 exports.createBudget = async (req, res) => {
   try {
+    console.log('Create budget request received');
+    console.log('User:', req.user);
+    console.log('Request body:', req.body);
+    
     if (!req.user || !req.user.userId) {
+      console.log('User not authenticated');
       return res.status(401).json({ error: 'User not authenticated' });
     }
     
     const { userId } = req.user;
     const { category, budgetAmount, period = 'monthly', alertThreshold = 0.80 } = req.body;
 
+    console.log('Extracted data:', { userId, category, budgetAmount, period, alertThreshold });
+
     // Validate required fields
     if (!category || !budgetAmount) {
+      console.log('Missing required fields');
       return res.status(400).json({ error: 'Category and budget amount are required' });
     }
 
     if (budgetAmount <= 0) {
+      console.log('Invalid budget amount');
       return res.status(400).json({ error: 'Budget amount must be greater than 0' });
     }
 
@@ -58,6 +71,18 @@ exports.createBudget = async (req, res) => {
     }
 
     // Create new budget
+    console.log('Creating budget with data:', {
+      userSub: userId,
+      category,
+      budgetAmount,
+      period,
+      startDate,
+      endDate,
+      alertThreshold,
+      currentSpent: 0,
+      isActive: true
+    });
+    
     const budget = await Budget.create({
       userSub: userId,
       category,
@@ -69,6 +94,8 @@ exports.createBudget = async (req, res) => {
       currentSpent: 0,
       isActive: true
     });
+
+    console.log('Budget created successfully:', budget);
 
     res.status(201).json({
       message: 'Budget created successfully',
@@ -101,36 +128,79 @@ exports.getBudgets = async (req, res) => {
     const { userId } = req.user;
     const { active = true, period } = req.query;
 
+    console.log('Get budgets request for user:', userId);
+    console.log('Query params:', { active, period });
+
     let whereClause = { userSub: userId };
 
     if (active !== undefined) {
-      whereClause.isActive = active === 'true';
+      // Handle both string and boolean values
+      whereClause.isActive = active === 'true' || active === true;
     }
 
     if (period) {
       whereClause.period = period;
     }
 
+    console.log('Where clause:', whereClause);
+
     const budgets = await Budget.findAll({
       where: whereClause,
       order: [['createdAt', 'DESC']]
     });
 
-    const budgetData = budgets.map(budget => ({
-      id: budget.id,
-      category: budget.category,
-      budgetAmount: parseFloat(budget.budgetAmount),
-      currentSpent: parseFloat(budget.currentSpent),
-      remaining: budget.getRemainingAmount(),
-      usagePercentage: budget.getUsagePercentage(),
-      period: budget.period,
-      startDate: budget.startDate,
-      endDate: budget.endDate,
-      alertThreshold: parseFloat(budget.alertThreshold),
-      isActive: budget.isActive,
-      isOverBudget: budget.isOverBudget(),
-      isNearLimit: budget.isNearLimit()
-    }));
+    console.log('Found budgets:', budgets.length);
+    console.log('Budget data:', budgets.map(b => ({ id: b.id, category: b.category, userSub: b.userSub, isActive: b.isActive })));
+
+    // Update current spending for each budget
+    const items = await Item.findAll({ where: { userSub: userId } });
+    
+    // Get current spending data for this month
+    const now = new Date();
+    let currentSpending = [];
+    
+    if (items.length > 0) {
+      currentSpending = await getCategorySpendingFromTransactions(items, {
+        date: {
+          [Op.gte]: new Date(now.getFullYear(), now.getMonth(), 1),
+          [Op.lte]: now
+        }
+      });
+    }
+
+    console.log('Current spending categories:', currentSpending.map(s => ({ category: s.category, amount: s.amount })));
+
+    const budgetData = budgets.map(budget => {
+      // Find matching spending category
+      const categorySpending = currentSpending.find(
+        spending => spending.category.toLowerCase() === budget.category.toLowerCase()
+      );
+      
+      const actualSpent = categorySpending ? Math.abs(categorySpending.amount) : 0;
+      
+      console.log(`Budget ${budget.category}: found spending ${actualSpent} for category ${budget.category}`);
+      
+      // Update budget's current spent in database
+      budget.update({ currentSpent: actualSpent });
+
+      return {
+        id: budget.id,
+        category: budget.category,
+        budgetAmount: parseFloat(budget.budgetAmount),
+        currentSpent: actualSpent,
+        remaining: parseFloat(budget.budgetAmount) - actualSpent,
+        usagePercentage: parseFloat(budget.budgetAmount) > 0 ? actualSpent / parseFloat(budget.budgetAmount) : 0,
+        period: budget.period,
+        startDate: budget.startDate,
+        endDate: budget.endDate,
+        alertThreshold: parseFloat(budget.alertThreshold),
+        isActive: budget.isActive,
+        isOverBudget: actualSpent > parseFloat(budget.budgetAmount),
+        isNearLimit: actualSpent >= parseFloat(budget.budgetAmount) * parseFloat(budget.alertThreshold)
+      };
+    });
+
+    console.log('Returning budget data:', budgetData);
 
     res.json({
       budgets: budgetData,

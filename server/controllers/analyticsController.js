@@ -515,16 +515,27 @@ exports.getBudgetAnalysis = async (req, res) => {
       console.log('No transaction data found for budget analysis');
     }
 
+    console.log('Current spending categories:', currentSpending.map(s => s.category));
+    console.log('Budget categories:', budgets.map(b => b.category));
+
     // Match spending to budgets and update current spent
     const budgetAnalysis = [];
     const alerts = [];
 
     for (const budget of budgets) {
+      console.log(`Looking for spending category matching budget: "${budget.category}"`);
+      
       const categorySpending = currentSpending.find(
-        spending => spending.category.toLowerCase() === budget.category.toLowerCase()
+        spending => {
+          const match = spending.category.toLowerCase() === budget.category.toLowerCase();
+          console.log(`  Comparing "${spending.category}" with "${budget.category}": ${match}`);
+          return match;
+        }
       );
       
       const actualSpent = categorySpending ? Math.abs(categorySpending.amount) : 0;
+      
+      console.log(`Budget "${budget.category}": Found spending = ${actualSpent}, Category data:`, categorySpending);
       
       // Update budget's current spent
       await budget.update({ currentSpent: actualSpent });
@@ -799,5 +810,8 @@ function determineTransactionCategory(transaction) {
   // Default fallback
   return 'Other';
 }
+
+// Export the helper function for use in other controllers
+exports.getCategorySpendingFromTransactions = getCategorySpendingFromTransactions;
 
 module.exports = exports;
