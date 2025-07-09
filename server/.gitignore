@@ -99,22 +99,3 @@ aws-exports.js
 # Temporary files
 *.tmp
 *.temp
-
-# PDF files (statements and reports)
-*.pdf
-statements/
-reports/
-
-# Package manager lock files (if using multiple managers)
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
-
-# Debug files
-debug/
-.debug/
-
-# Test files and coverage
-test-results/
-playwright-report/
-test-results.xml

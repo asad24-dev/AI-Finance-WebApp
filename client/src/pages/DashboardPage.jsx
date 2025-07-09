@@ -250,13 +250,13 @@ const DashboardPage = ({ user, signOut }) => {
                         gap: '24px'
                       }}>
                         <AccountsList accounts={accounts.slice(0, 3)} />
-                        <TransactionsList transactions={transactions.slice(0, 5)} accounts={accounts} />
+                        <TransactionsList transactions={transactions.slice(0, 5)} />
                       </div>
                     )}
                   </div>
                 )}
                 {activeTab === 'accounts' && <AccountsList accounts={accounts} />}
-                {activeTab === 'transactions' && <TransactionsList transactions={transactions} accounts={accounts} />}
+                {activeTab === 'transactions' && <TransactionsList transactions={transactions} />}
                 {activeTab === 'budgets' && <BudgetManager />}
                 {activeTab === 'insights' && <InsightsPanel />}
               </div>
