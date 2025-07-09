@@ -15,10 +15,12 @@
     "@aws-amplify/ui-react": "^6.11.2",
     "aws-amplify": "^6.15.3",
     "axios": "^1.10.0",
+    "date-fns": "^4.1.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-plaid-link": "^4.0.1",
-    "react-router-dom": "^7.6.3"
+    "react-router-dom": "^7.6.3",
+    "recharts": "^3.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.29.0",

@@ -1,7 +1,7 @@
 // server/models/Item.js
-import { DataTypes } from 'sequelize';
-import sequelize from '../config/database.js';
-import User from './User.js';
+const { DataTypes } = require('sequelize');
+const sequelize = require('../config/database');
+const User = require('./User');
 
 const Item = sequelize.define('Item', {
   item_id: {
@@ -18,4 +18,4 @@ const Item = sequelize.define('Item', {
 Item.belongsTo(User, { foreignKey: 'userSub' });
 User.hasMany(Item, { foreignKey: 'userSub' });
 
-export default Item;
+module.exports = Item;

@@ -1,7 +1,11 @@
 // src/components/TransactionsList.jsx
-import React from 'react';
+import React, { useState } from 'react';
+import api from '../services/api';
 
-const TransactionsList = ({ transactions }) => {
+const TransactionsList = ({ transactions, accounts = [] }) => {
+  const [selectedAccount, setSelectedAccount] = useState('');
+  const [isDownloading, setIsDownloading] = useState(false);
+
   if (!transactions || transactions.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '40px 20px' }}>
@@ -36,6 +40,48 @@ const TransactionsList = ({ transactions }) => {
       </div>
     );
   }
+
+  // Filter transactions by selected account
+  const filteredTransactions = selectedAccount 
+    ? transactions.filter(tx => tx.account_id === selectedAccount)
+    : transactions;
+
+  const handleDownloadStatement = async () => {
+    try {
+      setIsDownloading(true);
+      
+      const params = new URLSearchParams();
+      if (selectedAccount) {
+        params.append('accountId', selectedAccount);
+      }
+      
+      const response = await api.get(`/plaid/statement?${params.toString()}`, {
+        responseType: 'blob'
+      });
+      
+      // Create blob URL and download
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      const accountName = selectedAccount 
+        ? accounts.find(acc => acc.account_id === selectedAccount)?.name || 'Account'
+        : 'All-Accounts';
+      
+      link.download = `Transaction-Statement-${accountName}-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+    } catch (error) {
+      console.error('Error downloading statement:', error);
+      alert('Failed to download statement. Please try again.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -107,28 +153,106 @@ const TransactionsList = ({ transactions }) => {
   };
 
   // Sort transactions by date (newest first)
-  const sortedTransactions = [...transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const sortedTransactions = [...filteredTransactions].sort((a, b) => new Date(b.date) - new Date(a.date));
 
   return (
     <div>
-      <div style={{ marginBottom: '24px' }}>
-        <h2 style={{ 
-          color: 'var(--text-primary)',
-          fontSize: '24px',
-          fontWeight: '700',
-          margin: 0
-        }}>
-          Recent Transactions
-        </h2>
-        <p style={{ 
-          color: 'var(--text-secondary)',
-          fontSize: '16px',
-          marginTop: '4px',
-          margin: 0
-        }}>
-          Your latest financial activity across all accounts
-        </p>
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'flex-start',
+        marginBottom: '24px',
+        flexWrap: 'wrap',
+        gap: '16px'
+      }}>
+        <div>
+          <h2 style={{ 
+            color: 'var(--text-primary)',
+            fontSize: '24px',
+            fontWeight: '700',
+            margin: 0
+          }}>
+            Recent Transactions
+          </h2>
+          <p style={{ 
+            color: 'var(--text-secondary)',
+            fontSize: '16px',
+            marginTop: '4px',
+            margin: 0
+          }}>
+            Your latest financial activity across all accounts
+          </p>
+        </div>
+        
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Account Filter */}
+          <select 
+            value={selectedAccount}
+            onChange={(e) => setSelectedAccount(e.target.value)}
+            style={{
+              padding: '8px 12px',
+              borderRadius: 'var(--border-radius)',
+              border: '1px solid var(--border-color)',
+              backgroundColor: 'var(--surface-color)',
+              color: 'var(--text-primary)',
+              fontSize: '14px',
+              minWidth: '150px'
+            }}
+          >
+            <option value="">All Accounts</option>
+            {accounts.map(account => (
+              <option key={account.account_id} value={account.account_id}>
+                {account.name} (****{account.account_id?.slice(-4)})
+              </option>
+            ))}
+          </select>
+          
+          {/* Download Statement Button */}
+          <button
+            onClick={handleDownloadStatement}
+            disabled={isDownloading}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: 'var(--primary-color)',
+              color: 'white',
+              border: 'none',
+              borderRadius: 'var(--border-radius)',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: isDownloading ? 'not-allowed' : 'pointer',
+              opacity: isDownloading ? 0.7 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            {isDownloading ? '⏳' : '📄'} 
+            {isDownloading ? 'Generating...' : 'Download Statement'}
+          </button>
+        </div>
       </div>
+
+      {/* Filter Summary */}
+      {selectedAccount && (
+        <div style={{
+          padding: '12px 16px',
+          backgroundColor: 'var(--background-color)',
+          borderRadius: 'var(--border-radius)',
+          marginBottom: '16px',
+          border: '1px solid var(--border-color)'
+        }}>
+          <p style={{ 
+            color: 'var(--text-secondary)',
+            fontSize: '14px',
+            margin: 0
+          }}>
+            🔍 Showing transactions for: <strong style={{ color: 'var(--text-primary)' }}>
+              {accounts.find(acc => acc.account_id === selectedAccount)?.name || 'Selected Account'}
+            </strong> ({filteredTransactions.length} transactions)
+          </p>
+        </div>
+      )}
 
       <div className="table-container">
         <table className="table">
@@ -226,7 +350,10 @@ const TransactionsList = ({ transactions }) => {
           fontSize: '14px',
           margin: 0
         }}>
-          📊 <strong>Total Transactions:</strong> {transactions.length} • 
+          📊 <strong>Showing:</strong> {filteredTransactions.length} of {transactions.length} transactions
+          {selectedAccount && (
+            <span> • <strong>Account:</strong> {accounts.find(acc => acc.account_id === selectedAccount)?.name}</span>
+          )} • 
           <strong> Latest sync:</strong> {new Date().toLocaleDateString()}
         </p>
       </div>

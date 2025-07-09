@@ -2,13 +2,17 @@ import React, { useEffect, useState } from 'react';
 import AccountsList from '../components/AccountsList';
 import TransactionsList from '../components/TransactionsList';
 import PlaidLinkButton from '../components/PlaidLinkButton';
+import SpendingChart from '../components/SpendingChart';
+import BudgetManager from '../components/BudgetManager';
+import InsightsPanel from '../components/InsightsPanel';
 import api from '../services/api';
 
 const DashboardPage = ({ user, signOut }) => {
   const [accounts, setAccounts] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [spendingData, setSpendingData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('accounts');
+  const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -20,6 +24,10 @@ const DashboardPage = ({ user, signOut }) => {
         // Fetch transactions
         const transactionsRes = await api.get('/plaid/transactions');
         setTransactions(transactionsRes.data.transactions);
+
+        // Fetch spending analytics
+        const spendingRes = await api.get('/analytics/spending');
+        setSpendingData(spendingRes.data.categorySpending);
       } catch (error) {
         console.error('Failed to fetch data:', error);
       } finally {
@@ -200,6 +208,12 @@ const DashboardPage = ({ user, signOut }) => {
             <div className="card">
               <div className="tabs">
                 <button 
+                  className={`tab-button ${activeTab === 'overview' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('overview')}
+                >
+                  📊 Overview
+                </button>
+                <button 
                   className={`tab-button ${activeTab === 'accounts' ? 'active' : ''}`}
                   onClick={() => setActiveTab('accounts')}
                 >
@@ -211,11 +225,40 @@ const DashboardPage = ({ user, signOut }) => {
                 >
                   📋 Transactions
                 </button>
+                <button 
+                  className={`tab-button ${activeTab === 'budgets' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('budgets')}
+                >
+                  💰 Budgets
+                </button>
+                <button 
+                  className={`tab-button ${activeTab === 'insights' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('insights')}
+                >
+                  💡 Insights
+                </button>
               </div>
 
               <div className="card-body">
+                {activeTab === 'overview' && (
+                  <div style={{ display: 'grid', gap: '24px' }}>
+                    <SpendingChart data={spendingData} title="Current Month Spending" />
+                    {accounts.length > 0 && (
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                        gap: '24px'
+                      }}>
+                        <AccountsList accounts={accounts.slice(0, 3)} />
+                        <TransactionsList transactions={transactions.slice(0, 5)} accounts={accounts} />
+                      </div>
+                    )}
+                  </div>
+                )}
                 {activeTab === 'accounts' && <AccountsList accounts={accounts} />}
-                {activeTab === 'transactions' && <TransactionsList transactions={transactions} />}
+                {activeTab === 'transactions' && <TransactionsList transactions={transactions} accounts={accounts} />}
+                {activeTab === 'budgets' && <BudgetManager />}
+                {activeTab === 'insights' && <InsightsPanel />}
               </div>
             </div>
           </>

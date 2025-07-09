@@ -68,3 +68,17 @@ ehthumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Downloaded files (PDFs, statements)
+downloads/
+*.pdf
+
+# Package manager lock files (if using multiple managers)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Browser cache and storage
+.chrome/
+.firefox/
+localStorage/

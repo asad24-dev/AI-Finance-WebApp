@@ -1,17 +1,17 @@
 // server/server.js
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import plaidRoutes from './routes/plaidRoutes.js';
+const express = require('express');
+const cors = require('cors');
+const dotenv = require('dotenv');
+const plaidRoutes = require('./routes/plaidRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
+const budgetRoutes = require('./routes/budgetRoutes');
 
+const { verifyToken } = require('./middleware/authMiddleware');
 
-import { verifyToken } from './middleware/authMiddleware.js';
-
-import sequelize from './config/database.js';
-import './models/User.js';
-import './models/Item.js';
-
-
+const sequelize = require('./config/database');
+require('./models/User');
+require('./models/Item');
+require('./models/Budget');
 
 dotenv.config();
 
@@ -28,12 +28,20 @@ app.get('/api/protected', verifyToken, (req, res) => {
 });
 
 app.use('/api/plaid', plaidRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/budgets', budgetRoutes);
 
-app.listen(3001, () => console.log('Server running on port 3001'));
-try {
-  await sequelize.authenticate();
-  console.log('✅ DB connected successfully.');
-  await sequelize.sync({ alter: true }); // auto-create/update tables
-} catch (err) {
-  console.error('❌ DB connection error:', err);
-}
+const PORT = process.env.PORT || 3001;
+
+app.listen(PORT, async () => {
+  console.log(`Server running on port ${PORT}`);
+  
+  try {
+    await sequelize.authenticate();
+    console.log('✅ DB connected successfully.');
+    await sequelize.sync({ alter: true }); // Use alter instead of force to preserve existing data
+    console.log('✅ DB tables synchronized.');
+  } catch (err) {
+    console.error('❌ DB connection error:', err);
+  }
+});
