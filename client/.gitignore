@@ -1,3 +1,22 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build outputs
+dist
+dist-ssr
+build
+.vite
+.turbo
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.local
+
 # Logs
 logs
 *.log
@@ -7,14 +26,27 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
-.env
+# Coverage reports
+coverage
+*.lcov
+.nyc_output
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Cache
+.npm
+.eslintcache
+.stylelintcache
+.parcel-cache
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
+!.vscode/settings.json
 .idea
 .DS_Store
 *.suo
@@ -23,7 +55,16 @@ dist-ssr
 *.sln
 *.sw?
 
-aws-exports.js
-dist/
-build/
-.vite/
+# OS generated files
+Thumbs.db
+ehthumbs.db
+.Spotlight-V100
+.Trashes
+
+# AWS/Amplify specific (if using AWS Amplify CLI)
+# aws-exports.js
+# amplify/
+
+# Temporary files
+*.tmp
+*.temp
