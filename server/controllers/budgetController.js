@@ -2,9 +2,444 @@
 const { Op } = require('sequelize');
 const Budget = require('../models/Budget');
 const Item = require('../models/Item');
-const { getCategorySpendingFromTransactions } = require('./analyticsController');
+const { Configuration, PlaidApi, PlaidEnvironments } = require('plaid');
 const dotenv = require('dotenv');
 dotenv.config();
+
+// Initialize Plaid client
+const configuration = new Configuration({
+  basePath: PlaidEnvironments[process.env.PLAID_ENV],
+  baseOptions: {
+    headers: {
+      'PLAID-CLIENT-ID': process.env.PLAID_CLIENT_ID,
+      'PLAID-SECRET': process.env.PLAID_SECRET,
+    },
+  },
+});
+
+const plaidClient = new PlaidApi(configuration);
+
+// Enhanced category mapping (consistent with analyticsController)
+const CATEGORY_MAPPING = {
+  // Primary Plaid categories
+  'Food and Drink': 'Food & Dining',
+  'Shops': 'Shopping', 
+  'Recreation': 'Entertainment',
+  'Transportation': 'Transportation',
+  'Healthcare': 'Healthcare',
+  'Service': 'Services',
+  'Bank Fees': 'Fees',
+  'Bills': 'Utilities',
+  'Travel': 'Travel',
+  'Payment': 'Transfer',
+  'Deposit': 'Income',
+  'Payroll': 'Income',
+  'Interest': 'Income',
+  
+  // Detailed subcategories
+  'Restaurants': 'Food & Dining',
+  'Fast Food': 'Food & Dining',
+  'Coffee Shop': 'Food & Dining',
+  'Bar': 'Food & Dining',
+  'Groceries': 'Food & Dining',
+  'Food Delivery': 'Food & Dining',
+  
+  'Gas Stations': 'Transportation',
+  'Taxi': 'Transportation',
+  'Public Transportation': 'Transportation',
+  'Ride Share': 'Transportation',
+  'Parking': 'Transportation',
+  'Tolls': 'Transportation',
+  'Auto': 'Transportation',
+  'Automotive': 'Transportation',
+  
+  'Clothing': 'Shopping',
+  'Electronics': 'Shopping',
+  'General Merchandise': 'Shopping',
+  'Department Stores': 'Shopping',
+  'Sporting Goods': 'Shopping',
+  'Bookstores': 'Shopping',
+  'Pet Stores': 'Shopping',
+  
+  'Entertainment': 'Entertainment',
+  'Movies': 'Entertainment',
+  'Music': 'Entertainment',
+  'Gyms and Fitness Centers': 'Entertainment',
+  'Amusement': 'Entertainment',
+  'Arts': 'Entertainment',
+  'Games': 'Entertainment',
+  
+  'Medical': 'Healthcare',
+  'Dentists': 'Healthcare',
+  'Optometrists': 'Healthcare',
+  'Pharmacies': 'Healthcare',
+  'Hospitals': 'Healthcare',
+  'Mental Health': 'Healthcare',
+  'Therapy': 'Healthcare',
+  
+  'Utilities': 'Utilities',
+  'Telecommunication Services': 'Utilities',
+  'Internet': 'Utilities',
+  'Cable': 'Utilities',
+  'Phone': 'Utilities',
+  'Electric': 'Utilities',
+  'Water': 'Utilities',
+  'Gas': 'Utilities',
+  'Trash': 'Utilities',
+  
+  'Home Improvement': 'Home',
+  'Furniture': 'Home',
+  'Hardware': 'Home',
+  'Home & Garden': 'Home',
+  'Rent': 'Home',
+  'Mortgage': 'Home',
+  
+  'Personal Care': 'Personal Care',
+  'Laundry': 'Personal Care',
+  'Hair': 'Personal Care',
+  'Spa': 'Personal Care',
+  
+  'Professional Services': 'Services',
+  'Legal': 'Services',
+  'Accounting': 'Services',
+  'Automotive Services': 'Services',
+  'Repair': 'Services',
+  'Cleaning': 'Services',
+  
+  'Government': 'Fees',
+  'Taxes': 'Fees',
+  'Fines': 'Fees',
+  'ATM': 'Fees',
+  'Bank': 'Fees',
+  'Credit Card': 'Fees',
+  'Overdraft': 'Fees',
+  
+  'Hotels': 'Travel',
+  'Lodging': 'Travel',
+  'Airlines': 'Travel',
+  'Car Rental': 'Travel',
+  'Travel Insurance': 'Travel',
+  'Vacation': 'Travel',
+  
+  'Education': 'Education',
+  'Schools': 'Education',
+  'Student Loans': 'Education',
+  'Tuition': 'Education',
+  'Books': 'Education',
+  
+  'Charitable Giving': 'Charity',
+  'Religious': 'Charity',
+  'Donations': 'Charity'
+};
+
+// Merchant-based category mapping for better accuracy
+const MERCHANT_CATEGORY_MAPPING = {
+  // Transportation
+  'uber': 'Transportation',
+  'lyft': 'Transportation',
+  'taxi': 'Transportation',
+  'metro': 'Transportation',
+  'bus': 'Transportation',
+  'train': 'Transportation',
+  'subway': 'Transportation',
+  'shell': 'Transportation',
+  'bp': 'Transportation',
+  'exxon': 'Transportation',
+  'chevron': 'Transportation',
+  'mobil': 'Transportation',
+  'citgo': 'Transportation',
+  'speedway': 'Transportation',
+  'wawa': 'Transportation',
+  '7-eleven': 'Transportation',
+  'parking': 'Transportation',
+  
+  // Food & Dining
+  'mcdonalds': 'Food & Dining',
+  'burger king': 'Food & Dining',
+  'kfc': 'Food & Dining',
+  'subway': 'Food & Dining',
+  'dominos': 'Food & Dining',
+  'pizza hut': 'Food & Dining',
+  'papa johns': 'Food & Dining',
+  'chipotle': 'Food & Dining',
+  'panera': 'Food & Dining',
+  'starbucks': 'Food & Dining',
+  'dunkin': 'Food & Dining',
+  'tim hortons': 'Food & Dining',
+  'whole foods': 'Food & Dining',
+  'kroger': 'Food & Dining',
+  'safeway': 'Food & Dining',
+  'walmart': 'Food & Dining',
+  'target': 'Food & Dining',
+  'costco': 'Food & Dining',
+  'sams club': 'Food & Dining',
+  'trader joes': 'Food & Dining',
+  'aldi': 'Food & Dining',
+  'publix': 'Food & Dining',
+  'wegmans': 'Food & Dining',
+  'harris teeter': 'Food & Dining',
+  'food lion': 'Food & Dining',
+  'giant': 'Food & Dining',
+  'stop & shop': 'Food & Dining',
+  'king soopers': 'Food & Dining',
+  'ralphs': 'Food & Dining',
+  'vons': 'Food & Dining',
+  'albertsons': 'Food & Dining',
+  'meijer': 'Food & Dining',
+  'heb': 'Food & Dining',
+  'doordash': 'Food & Dining',
+  'grubhub': 'Food & Dining',
+  'uber eats': 'Food & Dining',
+  'postmates': 'Food & Dining',
+  
+  // Shopping
+  'amazon': 'Shopping',
+  'ebay': 'Shopping',
+  'walmart': 'Shopping',
+  'target': 'Shopping',
+  'costco': 'Shopping',
+  'best buy': 'Shopping',
+  'home depot': 'Shopping',
+  'lowes': 'Shopping',
+  'macys': 'Shopping',
+  'nordstrom': 'Shopping',
+  'kohls': 'Shopping',
+  'jcpenney': 'Shopping',
+  'tj maxx': 'Shopping',
+  'marshalls': 'Shopping',
+  'old navy': 'Shopping',
+  'gap': 'Shopping',
+  'h&m': 'Shopping',
+  'zara': 'Shopping',
+  'forever 21': 'Shopping',
+  'victorias secret': 'Shopping',
+  'bath & body works': 'Shopping',
+  'sephora': 'Shopping',
+  'ulta': 'Shopping',
+  'cvs': 'Shopping',
+  'walgreens': 'Shopping',
+  'rite aid': 'Shopping',
+  
+  // Entertainment
+  'netflix': 'Entertainment',
+  'hulu': 'Entertainment',
+  'disney+': 'Entertainment',
+  'amazon prime': 'Entertainment',
+  'spotify': 'Entertainment',
+  'apple music': 'Entertainment',
+  'youtube': 'Entertainment',
+  'hbo': 'Entertainment',
+  'showtime': 'Entertainment',
+  'amc': 'Entertainment',
+  'regal': 'Entertainment',
+  'cinemark': 'Entertainment',
+  'planet fitness': 'Entertainment',
+  'la fitness': 'Entertainment',
+  '24 hour fitness': 'Entertainment',
+  'gold\'s gym': 'Entertainment',
+  'ymca': 'Entertainment',
+  'steam': 'Entertainment',
+  'playstation': 'Entertainment',
+  'xbox': 'Entertainment',
+  'nintendo': 'Entertainment',
+  
+  // Utilities
+  'comcast': 'Utilities',
+  'verizon': 'Utilities',
+  'att': 'Utilities',
+  't-mobile': 'Utilities',
+  'sprint': 'Utilities',
+  'xfinity': 'Utilities',
+  'spectrum': 'Utilities',
+  'directv': 'Utilities',
+  'dish': 'Utilities',
+  'electric': 'Utilities',
+  'gas': 'Utilities',
+  'water': 'Utilities',
+  'internet': 'Utilities',
+  'cable': 'Utilities',
+  'phone': 'Utilities'
+};
+
+// Category colors for consistency
+const CATEGORY_COLORS = {
+  'Food & Dining': '#FF6B6B',
+  'Transportation': '#4ECDC4', 
+  'Shopping': '#45B7D1',
+  'Entertainment': '#FFA07A',
+  'Healthcare': '#98D8C8',
+  'Utilities': '#F7DC6F',
+  'Travel': '#BB8FCE',
+  'Education': '#85C1E9',
+  'Personal Care': '#F8C471',
+  'Services': '#82E0AA',
+  'Fees': '#EC7063',
+  'Home': '#D7BDE2',
+  'Charity': '#A9DFBF',
+  'Income': '#7FB3D3',
+  'Transfer': '#D5A6BD',
+  'Other': '#BDC3C7'
+};
+
+// Enhanced function to determine transaction category (consistent with analyticsController)
+function determineTransactionCategory(transaction) {
+  const merchantName = transaction.merchant_name || transaction.account_owner || '';
+  const transactionName = transaction.name || '';
+  
+  // 1. First try merchant-based mapping for better accuracy
+  if (merchantName) {
+    const merchantKey = merchantName.toLowerCase();
+    for (const [merchant, category] of Object.entries(MERCHANT_CATEGORY_MAPPING)) {
+      if (merchantKey.includes(merchant)) {
+        return category;
+      }
+    }
+  }
+  
+  // 2. Try transaction name-based mapping
+  if (transactionName) {
+    const nameKey = transactionName.toLowerCase();
+    for (const [merchant, category] of Object.entries(MERCHANT_CATEGORY_MAPPING)) {
+      if (nameKey.includes(merchant)) {
+        return category;
+      }
+    }
+  }
+  
+  // 3. Use Plaid's detailed category hierarchy
+  if (transaction.category && transaction.category.length > 0) {
+    // Try detailed categories first (more specific)
+    for (let i = transaction.category.length - 1; i >= 0; i--) {
+      const categoryName = transaction.category[i];
+      if (CATEGORY_MAPPING[categoryName]) {
+        return CATEGORY_MAPPING[categoryName];
+      }
+    }
+    
+    // If no detailed match, try primary category
+    const primaryCategory = transaction.category[0];
+    if (CATEGORY_MAPPING[primaryCategory]) {
+      return CATEGORY_MAPPING[primaryCategory];
+    }
+    
+    // Return the primary category as-is if no mapping found
+    return primaryCategory;
+  }
+  
+  // 4. Special handling for common transaction patterns
+  const combinedText = `${merchantName} ${transactionName}`.toLowerCase();
+  
+  // Transportation patterns
+  if (combinedText.match(/\b(taxi|cab|ride|transport|metro|bus|train|parking|toll|gas|fuel|petrol)\b/)) {
+    return 'Transportation';
+  }
+  
+  // Food patterns  
+  if (combinedText.match(/\b(restaurant|cafe|coffee|pizza|food|lunch|dinner|breakfast|grocery|market)\b/)) {
+    return 'Food & Dining';
+  }
+  
+  // Shopping patterns
+  if (combinedText.match(/\b(store|shop|retail|mall|purchase|buy|order)\b/)) {
+    return 'Shopping';
+  }
+  
+  // Entertainment patterns
+  if (combinedText.match(/\b(movie|cinema|game|sport|gym|fitness|entertainment|music|streaming)\b/)) {
+    return 'Entertainment';
+  }
+  
+  // Healthcare patterns
+  if (combinedText.match(/\b(doctor|hospital|pharmacy|medical|health|dental|clinic)\b/)) {
+    return 'Healthcare';
+  }
+  
+  // Utilities patterns
+  if (combinedText.match(/\b(electric|water|gas|internet|phone|cable|utility|bill)\b/)) {
+    return 'Utilities';
+  }
+  
+  // Banking/Fees patterns
+  if (combinedText.match(/\b(fee|charge|atm|bank|interest|penalty|overdraft)\b/)) {
+    return 'Fees';
+  }
+  
+  // Default fallback
+  return 'Other';
+}
+
+// Helper function to get category spending from transactions (consistent with analyticsController)
+async function getCategorySpendingFromTransactions(items, dateFilter) {
+  const categorySpending = {};
+  
+  for (const item of items) {
+    try {
+      let startDate = new Date();
+      let endDate = new Date();
+      
+      if (dateFilter.date) {
+        if (dateFilter.date[Op.between]) {
+          startDate = dateFilter.date[Op.between][0];
+          endDate = dateFilter.date[Op.between][1];
+        } else if (dateFilter.date[Op.gte] && dateFilter.date[Op.lte]) {
+          startDate = dateFilter.date[Op.gte];
+          endDate = dateFilter.date[Op.lte];
+        } else if (dateFilter.date[Op.gte]) {
+          startDate = dateFilter.date[Op.gte];
+          endDate = new Date();
+        } else if (dateFilter.date[Op.lte]) {
+          // If only end date provided, go back 30 days from end date
+          endDate = dateFilter.date[Op.lte];
+          startDate = new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
+        }
+      }
+
+      console.log(`Fetching transactions for item ${item.item_id} from ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
+
+      const response = await plaidClient.transactionsGet({
+        access_token: item.access_token,
+        start_date: startDate.toISOString().split('T')[0],
+        end_date: endDate.toISOString().split('T')[0]
+      });
+
+      const transactions = response.data.transactions;
+      console.log(`Found ${transactions.length} transactions for item ${item.item_id}`);
+
+      transactions.forEach(transaction => {
+        // Skip positive amounts (deposits/income) for spending analysis
+        if (transaction.amount <= 0) return;
+
+        // Enhanced category detection using the same logic as analyticsController
+        let category = determineTransactionCategory(transaction);
+
+        // Initialize category if not exists
+        if (!categorySpending[category]) {
+          categorySpending[category] = {
+            category,
+            amount: 0,
+            count: 0,
+            color: CATEGORY_COLORS[category] || CATEGORY_COLORS['Other']
+          };
+        }
+
+        // Add transaction to category (amount is positive, so we negate it for spending)
+        categorySpending[category].amount -= transaction.amount;
+        categorySpending[category].count += 1;
+      });
+
+    } catch (error) {
+      console.error(`Error fetching transactions for item ${item.item_id}:`, error);
+    }
+  }
+
+  // Convert to array and sort by spending amount
+  const result = Object.values(categorySpending);
+  result.sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
+  
+  console.log(`getCategorySpendingFromTransactions result: ${result.length} categories, total spent: ${result.reduce((sum, cat) => sum + Math.abs(cat.amount), 0)}`);
+  
+  return result;
+}
 
 // Create a new budget
 exports.createBudget = async (req, res) => {

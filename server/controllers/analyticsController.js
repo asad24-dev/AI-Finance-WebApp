@@ -811,7 +811,4 @@ function determineTransactionCategory(transaction) {
   return 'Other';
 }
 
-// Export the helper function for use in other controllers
-exports.getCategorySpendingFromTransactions = getCategorySpendingFromTransactions;
-
 module.exports = exports;
