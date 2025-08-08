@@ -8,28 +8,37 @@ const budgetRoutes = require('./routes/budgetRoutes');
 
 const { verifyToken } = require('./middleware/authMiddleware');
 
+// Load environment variables - only if .env file exists (for local development)
+if (process.env.NODE_ENV !== 'production') {
+  dotenv.config();
+}
+
 const sequelize = require('./config/database');
 require('./models/User');
 require('./models/Item');
 require('./models/Budget');
 
-dotenv.config();
-
 const app = express();
-app.use(cors());
+
+// CORS configuration
+app.use(cors({
+  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  credentials: true
+}));
+
 app.use(express.json());
 
-app.get('/api/test', (req, res) => {
+app.get('/test', (req, res) => {
   res.json({ message: 'Public route' });
 });
 
-app.get('/api/protected', verifyToken, (req, res) => {
+app.get('/protected', verifyToken, (req, res) => {
   res.json({ message: `Hello ${req.user.email}, you are authenticated!` });
 });
 
-app.use('/api/plaid', plaidRoutes);
-app.use('/api/analytics', analyticsRoutes);
-app.use('/api/budgets', budgetRoutes);
+app.use('/plaid', plaidRoutes);
+app.use('/analytics', analyticsRoutes);
+app.use('/budget', budgetRoutes);
 
 const PORT = process.env.PORT || 3001;
 
