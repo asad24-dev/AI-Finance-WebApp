@@ -46,11 +46,16 @@ app.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
   
   try {
+    console.log('🔄 Attempting database connection...');
     await sequelize.authenticate();
     console.log('✅ DB connected successfully.');
+    
+    console.log('🔄 Synchronizing database tables...');
     await sequelize.sync({ alter: true }); // Use alter instead of force to preserve existing data
     console.log('✅ DB tables synchronized.');
   } catch (err) {
     console.error('❌ DB connection error:', err);
+    console.error('❌ Error details:', err.message);
+    console.error('❌ Error code:', err.code);
   }
 });
